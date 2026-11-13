@@ -1,0 +1,50 @@
+### Local translation plugin strings (Simplified Chinese)
+
+translation-title = 本地翻译
+translation-button = 翻译
+translation-status-ready = 就绪
+translation-status-preparing = 正在准备本地模型…
+translation-status-running = 正在翻译…
+translation-status-succeeded = 翻译完成
+translation-status-cancelled = 已取消
+translation-status-failed = 翻译失败
+translation-source-summary = 原文
+translation-copy = 复制译文
+translation-retry = 重试
+translation-cancel = 取消
+translation-close = 关闭
+translation-settings = 设置…
+translation-empty-hint = 选中 PDF 文字后点击“翻译”
+
+translation-error-no-selection = 未获取到可翻译文字，请选择 PDF 中的文本
+translation-error-input-too-long = 选中文字过长，请缩短后重试
+translation-error-unsupported-platform = 当前系统或 CPU 暂不受支持
+translation-error-model-not-found = 本地模型文件缺失
+translation-error-model-not-configured = 请在设置中保存模型配置，并切换为当前配置
+translation-error-model-config = 模型参数无效，请在设置中检查
+translation-error-model-changed = 模型文件已变化，请重新读取并检测
+translation-error-model-split = 首版仅支持单文件 GGUF 模型
+translation-error-model-load = 模型加载失败，请检查文件和可用内存
+translation-error-gpu-unavailable = 无法使用 GPU 加速，请在设置中检测或改用 CPU
+translation-error-gpu-memory = GPU 显存不足，请减少 GPU 层数或上下文长度
+translation-error-gpu-load = GPU 推理失败，请在设置中重新检测
+translation-error-model-hash = 模型文件校验未通过
+translation-error-model-format = 当前引擎无法加载此模型格式
+translation-error-template = 模型模板不受当前引擎支持
+translation-error-asset-install = 无法准备本地翻译资源
+translation-error-engine-start = 本地翻译引擎启动失败
+translation-error-busy = 正在翻译另一段文字，请稍后重试
+translation-error-timeout = 本次翻译超时，请缩短选区重试
+translation-error-crashed = 本地引擎已退出
+translation-error-protocol = 本地引擎通信异常
+translation-error-empty = 本次没有生成译文
+translation-error-truncated = 译文可能不完整
+translation-error-language = 目标语言不受支持
+
+prefs-title = 本地翻译设置
+prefs-threads = CPU 线程
+prefs-idle = 空闲释放（分钟）
+prefs-status = 状态
+prefs-selftest = 自检
+prefs-restart = 重启引擎
+prefs-close = 关闭

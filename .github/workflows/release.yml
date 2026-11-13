@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CMAKE_BUILD_PARALLEL_LEVEL: '4'
+      VSLANG: '1033'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Check release tag
+        run: |
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$' -or $env:GITHUB_REF_NAME -ne "v$version") {
+            throw 'Push a stable v<package.json version> tag to publish.'
+          }
+
+      - name: Install build dependencies
+        run: |
+          npm ci --registry=https://registry.npmmirror.com
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+
+      - name: Build and verify package
+        run: |
+          npm run build
+          if ($LASTEXITCODE -ne 0) { throw 'Build or package verification failed' }
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          $xpi = Get-Item -LiteralPath "dist/local-translation-$version-win-x64-lite.xpi"
+          $existing = gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if (-not ($existing | ConvertFrom-Json).isDraft) {
+              throw 'This release is already published; its assets will not be replaced. Use a new version.'
+            }
+          }
+          else {
+            $notes = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+            @'
+          Zotero 本地选区翻译，适用于 Windows x64。
+
+          - 支持用户自备的单文件 GGUF 模型、Vulkan GPU 加速和 CPU 推理。
+          - 按配置管理模型路径、提示词和生成参数，保存与启用分开。
+          - 安装包不包含模型权重；安装后在“工具 → 本地翻译设置”中新增并启用配置。
+
+          下载 `.xpi` 文件，在 Zotero 的“工具 → 插件”中选择“从文件安装插件”。详细说明见仓库 README。
+          '@ | Set-Content -LiteralPath $notes -Encoding utf8
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --verify-tag --draft --title "Zotero 本地翻译 $tag" --notes-file $notes
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release' }
+          }
+          $assets = @($xpi.FullName, (Resolve-Path dist/build-manifest.json).Path, (Resolve-Path dist/SHA256SUMS).Path)
+          gh release upload $tag @assets --repo $env:GITHUB_REPOSITORY --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed' }
+          $verificationDir = Join-Path $env:RUNNER_TEMP 'release-download-check'
+          New-Item -ItemType Directory -Path $verificationDir -Force | Out-Null
+          gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $xpi.Name --dir $verificationDir
+          if ($LASTEXITCODE -ne 0) { throw 'Could not verify uploaded release asset' }
+          $downloaded = Get-FileHash -LiteralPath (Join-Path $verificationDir $xpi.Name) -Algorithm SHA256
+          $built = Get-FileHash -LiteralPath $xpi.FullName -Algorithm SHA256
+          if ($downloaded.Hash -ne $built.Hash) { throw 'Uploaded XPI hash differs from the verified build' }
+          gh release edit $tag --repo $env:GITHUB_REPOSITORY --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish release' }
+          $published = gh release view $tag --repo $env:GITHUB_REPOSITORY --json isDraft,url | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $published.isDraft) { throw 'Release is not public; update feed will not change' }
+          "Published: $($published.url)" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+      - name: Update published manifest on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $version = (Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json).version
+          $addonId = (Get-Content -LiteralPath addon/manifest.json -Raw | ConvertFrom-Json).applications.zotero.id
+          $candidate = Get-Content -LiteralPath dist/updates.json -Raw | ConvertFrom-Json -AsHashtable
+          $entry = @($candidate.addons[$addonId].updates | Where-Object { $_.version -eq $version })
+          if ($entry.Count -ne 1) { throw 'Candidate update entry missing or ambiguous' }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          $pushed = $false
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            git fetch origin main
+            if ($LASTEXITCODE -ne 0) { throw 'Could not fetch main' }
+            git checkout --detach origin/main
+            if ($LASTEXITCODE -ne 0) { throw 'Could not check out current main' }
+            $feed = Get-Content -LiteralPath updates.json -Raw | ConvertFrom-Json -AsHashtable
+            if (-not $feed.addons.ContainsKey($addonId) -or -not ($feed.addons[$addonId].updates -is [array])) {
+              throw 'The published update feed no longer matches this plugin ID'
+            }
+            $history = @($feed.addons[$addonId].updates | Where-Object { $_.version -ne $version })
+            $feed.addons[$addonId].updates = @($entry[0]) + $history
+            [IO.File]::WriteAllText((Join-Path $env:GITHUB_WORKSPACE 'updates.json'), ($feed | ConvertTo-Json -Depth 30) + "`n", [Text.UTF8Encoding]::new($false))
+            git add -- updates.json
+            if ($LASTEXITCODE -ne 0) { throw 'Could not stage update manifest' }
+            git diff --cached --quiet
+            if ($LASTEXITCODE -eq 0) { $pushed = $true; break }
+            git commit -m "Publish update manifest for $tag"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not commit update manifest' }
+            git push origin HEAD:refs/heads/main
+            if ($LASTEXITCODE -eq 0) { $pushed = $true; break }
+            # Retry against the latest main without force-pushing or replacing history.
+          }
+          if (-not $pushed) { throw 'Release is published, but main update failed; merge dist/updates.json manually' }
+          "Updated main/updates.json for $tag" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

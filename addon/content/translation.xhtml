@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<title>翻译为简体中文</title>
+	<meta charset="utf-8"/>
+	<link rel="stylesheet" href="styles.css"/>
+</head>
+<body class="zt-body">
+	<header class="zt-header">
+		<span class="zt-title">本地翻译</span>
+		<span id="zt-status" class="zt-status">正在加载模型…</span>
+		<span class="zt-spacer"></span>
+		<button id="zt-settings" class="zt-link" type="button">设置</button>
+	</header>
+
+	<section id="zt-loading" class="zt-section zt-grow zt-loading" role="status" aria-live="polite">
+		<div class="zt-loading-spinner" aria-hidden="true"></div>
+		<h1>正在加载本地模型</h1>
+		<p>首次启动可能需要一些时间，加载完成后将自动开始翻译。</p>
+	</section>
+
+	<section id="zt-source-section" class="zt-section" hidden="hidden">
+		<details id="zt-source-details">
+			<summary>原文</summary>
+			<textarea id="zt-source" readonly="readonly" spellcheck="false"></textarea>
+		</details>
+	</section>
+
+	<section id="zt-translation-section" class="zt-section zt-grow" hidden="hidden">
+		<div id="zt-translation" class="zt-translation" aria-live="polite"></div>
+	</section>
+
+	<footer class="zt-footer">
+		<button id="zt-copy" type="button" hidden="hidden">复制译文</button>
+		<button id="zt-retry" type="button" hidden="hidden">重试</button>
+		<button id="zt-cancel" type="button">取消</button>
+		<span class="zt-spacer"></span>
+		<button id="zt-close" type="button">关闭</button>
+	</footer>
+
+	<script><![CDATA[
+		let callbacks = null;
+		let currentTask = null;
+		let followOutput = true;
+
+		const el = {
+			status: document.getElementById('zt-status'),
+			loading: document.getElementById('zt-loading'),
+			sourceSection: document.getElementById('zt-source-section'),
+			translationSection: document.getElementById('zt-translation-section'),
+			source: document.getElementById('zt-source'),
+			sourceDetails: document.getElementById('zt-source-details'),
+			translation: document.getElementById('zt-translation'),
+			copy: document.getElementById('zt-copy'),
+			retry: document.getElementById('zt-retry'),
+			cancel: document.getElementById('zt-cancel'),
+			close: document.getElementById('zt-close'),
+			settings: document.getElementById('zt-settings'),
+		};
+
+		const STATE_LABELS = {
+			preparing: '正在加载模型…',
+			running: '正在翻译…',
+			succeeded: '翻译完成',
+			cancelled: '已取消',
+			failed: '翻译失败',
+		};
+
+		const ERROR_LABELS = {
+			NO_SELECTION: '未获取到可翻译文字，请选择 PDF 中的文本',
+			INPUT_TOO_LONG: '选中文字过长，请缩短后重试',
+			UNSUPPORTED_PLATFORM: '当前系统或 CPU 暂不受支持',
+			MODEL_NOT_FOUND: '本地模型文件无法读取，请在设置中重新定位文件',
+			MODEL_NOT_CONFIGURED: '请在设置中保存模型配置，并切换为当前配置',
+			MODEL_CONFIG_INVALID: '模型参数无效，请打开设置检查',
+			MODEL_CHANGED: '模型文件已变化，请在设置中重新读取并检测',
+			MODEL_SPLIT_UNSUPPORTED: '首版仅支持单文件 GGUF 模型',
+			MODEL_LOAD_FAILED: '模型加载失败，请检查文件和可用内存',
+			GPU_UNAVAILABLE: '无法使用 GPU 加速，请在设置中检测或改用 CPU',
+			GPU_OUT_OF_MEMORY: 'GPU 显存不足，请减少 GPU 层数或上下文长度',
+			GPU_LOAD_FAILED: 'GPU 推理失败，请在设置中检测或改用 CPU',
+			MODEL_HASH_MISMATCH: '模型文件校验未通过',
+			MODEL_FORMAT_UNSUPPORTED: '当前引擎无法加载此模型格式',
+			TEMPLATE_UNSUPPORTED: '模型模板不受当前引擎支持',
+			ASSET_INSTALL_FAILED: '无法准备本地翻译资源',
+			ENGINE_START_FAILED: '本地翻译引擎启动失败',
+			ENGINE_BUSY: '正在翻译另一段文字，请稍后重试',
+			ENGINE_TIMEOUT: '本次翻译超时，请缩短选区重试',
+			ENGINE_CRASHED: '本地引擎已退出',
+			PROTOCOL_ERROR: '本地引擎通信异常',
+			EMPTY_OUTPUT: '本次没有生成译文',
+			OUTPUT_TRUNCATED: '译文可能不完整',
+			CANCELLED: '已取消',
+			UNSUPPORTED_LANGUAGE: '目标语言不受支持',
+		};
+
+		function setStatus(text) {
+			el.status.textContent = text;
+		}
+
+		function render(task) {
+			if (!task) return;
+			currentTask = task;
+			const preparing = task.state === 'preparing';
+			el.loading.hidden = !preparing;
+			el.sourceSection.hidden = preparing;
+			el.translationSection.hidden = preparing;
+			el.copy.hidden = preparing;
+			el.retry.hidden = preparing;
+
+			document.title = '翻译为简体中文';
+			if (el.source.value !== task.rawText) {
+				el.source.value = task.rawText;
+			}
+
+			const atBottom = el.translation.scrollHeight - el.translation.scrollTop - el.translation.clientHeight < 24;
+			followOutput = atBottom || el.translation.scrollTop === 0;
+
+			if (task.state === 'preparing') {
+				setStatus(STATE_LABELS.preparing);
+				el.translation.textContent = '';
+			}
+			else if (task.state === 'running') {
+				setStatus(STATE_LABELS.running);
+				el.translation.textContent = task.partialText || '正在翻译…';
+			}
+			else if (task.state === 'succeeded') {
+				setStatus(STATE_LABELS.succeeded);
+				el.translation.textContent = task.resultText;
+			}
+			else if (task.state === 'cancelled') {
+				setStatus(STATE_LABELS.cancelled);
+				el.translation.textContent = '已取消';
+			}
+			else {
+				const label = ERROR_LABELS[task.errorCode] || '本地翻译失败';
+				setStatus(STATE_LABELS.failed);
+				el.translation.textContent = label;
+			}
+
+			el.copy.disabled = task.state !== 'succeeded' || !task.resultText;
+			el.cancel.disabled = !(task.state === 'preparing' || task.state === 'running');
+			el.retry.disabled = !(task.state === 'failed' || task.state === 'cancelled' || task.state === 'succeeded');
+
+			if (followOutput) {
+				el.translation.scrollTop = el.translation.scrollHeight;
+			}
+		}
+
+		el.copy.addEventListener('click', () => {
+			if (currentTask && currentTask.resultText && callbacks) callbacks.onCopy(currentTask.resultText);
+		});
+		el.retry.addEventListener('click', () => {
+			if (currentTask && callbacks) callbacks.onRetry(currentTask);
+		});
+		el.cancel.addEventListener('click', () => {
+			if (currentTask && callbacks) callbacks.onCancel(currentTask);
+		});
+		el.close.addEventListener('click', () => window.close());
+		el.settings.addEventListener('click', () => {
+			if (callbacks) callbacks.onSettings();
+		});
+
+		window.__ztView = { render, setStatus };
+		window.__ztInit = function (payload) {
+			callbacks = payload && payload.callbacks ? payload.callbacks : null;
+			if (payload && payload.task) render(payload.task);
+		};
+	]]></script>
+</body>
+</html>

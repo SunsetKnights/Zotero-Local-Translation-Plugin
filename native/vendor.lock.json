@@ -1,0 +1,51 @@
+{
+  "engine": {
+    "name": "llama.cpp",
+    "repo": "https://github.com/ggml-org/llama.cpp",
+    "commit": "f1a7dea99aae1623bad10c4ce31fe220033ab7f6",
+    "buildNumber": "11954",
+    "license": "MIT",
+    "quantization": "Q4_K / Q6_K (mainline types, no vendor patches)"
+  },
+  "source": {
+    "tarball": "https://github.com/ggml-org/llama.cpp/archive/f1a7dea99aae1623bad10c4ce31fe220033ab7f6.tar.gz",
+    "sha256": "ea09012e627a4455e6d2b2591c2fec4dc2d98f6dab7674cb31fc2aff90237122",
+    "bytes": 38671007
+  },
+  "vulkanBackend": {
+    "reason": "The Vulkan backend needs shader compilation (glslc from the Vulkan SDK), so the official DLL built from the same commit is used instead. Backends are loaded dynamically (GGML_BACKEND_DL).",
+    "release": "https://github.com/ggml-org/llama.cpp/releases/download/b11954/llama-b11954-bin-win-vulkan-x64.zip",
+    "zipSha256": "4394bbef67e476d7923223cc7327ae37b6a9646bb469e42eaea70a324d5e427c",
+    "files": {
+      "ggml-vulkan.dll": "5f4a659df234fbcbaa12bd9d9c4854c37a176794d243581d13e04b88fde6341c",
+      "libomp.dll": "a12116ba72d1d6820407cf30be23da04ce79d6bb8a71a5ee71759c5a1faa6f1c"
+    }
+  },
+  "json": {
+    "name": "nlohmann/json",
+    "version": "3.12.0",
+    "source": "vendored in the llama.cpp tree at vendor/nlohmann/json.hpp",
+    "license": "MIT"
+  },
+  "patches": [],
+  "build": {
+    "generator": "Ninja",
+    "buildType": "Release",
+    "compiler": "MSVC 19.51 (Visual Studio 2026 BuildTools 18.8)",
+    "options": {
+      "BUILD_SHARED_LIBS": "ON",
+      "GGML_BACKEND_DL": "ON",
+      "GGML_CPU_ALL_VARIANTS": "ON",
+      "GGML_OPENMP": "OFF",
+      "GGML_VULKAN": "OFF (official DLL reused)",
+      "LLAMA_BUILD_TESTS": "OFF",
+      "LLAMA_BUILD_EXAMPLES": "OFF",
+      "LLAMA_BUILD_TOOLS": "OFF",
+      "LLAMA_BUILD_SERVER": "OFF",
+      "LLAMA_BUILD_COMMON": "ON",
+      "LLAMA_CURL": "OFF"
+    },
+    "minimumCpu": "x86-64 baseline; runtime picks the best CPU variant DLL (AVX2/AVX-VNNI/...)",
+    "backends": ["cpu", "vulkan"]
+  }
+}

@@ -1,0 +1,314 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+<head>
+  <title>本地翻译设置</title><meta charset="utf-8"/>
+  <link rel="stylesheet" href="chrome://global/skin/global.css"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <script src="chrome://global/content/customElements.js"></script>
+</head>
+<body class="zt-body">
+<div class="zt-prefs">
+ <div class="zt-prefs-scroll">
+  <section aria-labelledby="profilesheading">
+    <div class="zt-section-heading"><h2 id="profilesheading">模型配置</h2><span id="activeconfig" class="zt-secondary">尚未启用配置</span></div>
+    <div class="zt-config-list"><table class="zt-config-table" aria-label="已保存的模型配置">
+      <thead><tr><th>配置名称</th><th class="zt-model-column">模型</th><th>状态</th></tr></thead>
+      <tbody id="configrows"></tbody>
+    </table></div>
+    <div class="zt-config-toolbar">
+      <div class="zt-button-group"><button id="addconfig" type="button">新增</button><button id="editconfig" type="button" disabled="disabled">修改</button></div>
+      <div class="zt-button-group"><button id="useconfig" type="button" disabled="disabled">切换为当前配置</button><button id="deleteconfig" class="zt-danger-action" type="button" disabled="disabled">删除</button></div>
+    </div>
+    <p id="operationstatus" class="zt-note" role="status">选中配置可查看详情；修改后在面板底部保存。</p>
+    <div id="confirmation" class="zt-confirmation" role="alertdialog" aria-labelledby="confirmtext" hidden="hidden">
+      <p id="confirmtext"></p><div class="zt-button-group"><button id="confirmcancel" type="button">取消</button><button id="confirmaccept" type="button">确认</button></div>
+    </div>
+    <div class="zt-button-group"><button id="applycpu" type="button" hidden="hidden">以 CPU 启用此配置</button><button id="canceltest" type="button" hidden="hidden">取消检测</button></div>
+    <p id="testoutput" class="zt-note" role="status"></p>
+  </section>
+
+  <section class="zt-config-panel" aria-labelledby="paneltitle">
+    <div class="zt-panel-heading"><h2 id="paneltitle">配置详情</h2><span id="editstate" class="zt-secondary">尚未选择</span></div>
+    <div class="zt-config-fields">
+      <label class="zt-field zt-wide" for="configname"><span>配置名称</span><input id="configname" type="text" maxlength="100" placeholder="例如：论文翻译 / CPU 备用" disabled="disabled"/></label>
+      <div class="zt-field zt-wide"><label for="modelpath">模型文件</label><div class="zt-path-field"><input id="modelpath" type="text" placeholder="选择或填写单文件 GGUF 路径" disabled="disabled"/><button id="choose" type="button" disabled="disabled">选择文件…</button></div><span id="metadata" class="zt-secondary zt-path">尚未选择模型文件</span></div>
+      <div class="zt-field"><label id="preset-label" for="preset">参数预设</label><xul:menulist id="preset" class="zt-select" native="true" crop="end" sizetopopup="none" aria-labelledby="preset-label" disabled="true"><xul:menupopup><xul:menuitem value="" label="自定义参数"/></xul:menupopup></xul:menulist></div>
+      <div class="zt-field"><label id="executionmode-label" for="executionmode">推理方式</label><xul:menulist id="executionmode" class="zt-select" native="true" crop="end" sizetopopup="none" aria-labelledby="executionmode-label" disabled="true"><xul:menupopup><xul:menuitem value="gpu" label="GPU 优先"/><xul:menuitem value="cpu" label="仅 CPU"/></xul:menupopup></xul:menulist></div>
+      <p id="suggestion" class="zt-note zt-wide"></p>
+      <label class="zt-field zt-wide" for="promptTemplate"><span>翻译提示词 <span class="zt-secondary">必填</span></span><textarea id="promptTemplate" rows="4" disabled="disabled" placeholder="必须包含 {text}，可使用 {targetLanguage}"/><span class="zt-secondary">用 {text} 放置原文。目标语言：简体中文。</span></label>
+      <details class="zt-wide"><summary>高级参数</summary><div id="parameters" class="zt-parameter-grid"></div><div class="zt-parameter-grid">
+        <label class="zt-field" for="threads"><span>CPU 线程</span><input id="threads" type="number" min="1" max="8" step="1" disabled="disabled"/></label>
+        <label class="zt-field" for="gpulayers"><span>GPU 层数</span><input id="gpulayers" type="number" min="-1" max="999" step="1" disabled="disabled"/><span class="zt-secondary">-1 表示尝试全部层，正整数表示部分层。</span></label>
+        <label class="zt-field zt-wide" for="chatTemplate"><span>聊天模板</span><textarea id="chatTemplate" rows="3" disabled="disabled" placeholder="留空使用 GGUF 内置模板；没有内置模板时必填"/></label>
+      </div></details>
+    </div>
+    <div class="zt-panel-footer"><span id="savestatus" class="zt-secondary" role="status">点击“新增”创建模型配置。</span><div class="zt-button-group"><button id="canceledit" type="button" hidden="hidden">取消修改</button><button id="saveconfig" class="zt-primary-action" type="button" disabled="disabled">保存当前配置</button></div></div>
+  </section>
+
+  <details><summary>通用设置</summary><div class="zt-general-settings">
+    <label class="zt-checkbox-row" for="autorelease"><input id="autorelease" type="checkbox"/>空闲时自动释放模型</label>
+    <label class="zt-field" for="idle"><span>空闲时长（分钟）</span><input id="idle" type="number" min="1" max="60" step="1" disabled="disabled"/></label>
+    <p class="zt-note">关闭后，首次翻译时加载模型，并保持到退出 Zotero 或手动释放。</p>
+    <div class="zt-button-group"><button id="selftest" type="button">当前配置自检</button><button id="restart" type="button">重启引擎</button><button id="release" type="button" disabled="disabled">立即释放模型</button></div>
+  </div></details>
+  <p id="output" class="zt-note" role="status"></p>
+ </div>
+  <section class="zt-runtime-status" aria-label="当前运行状态" aria-live="polite">
+    <span class="zt-secondary">模型状态</span><span id="modelstatus" class="zt-path">未加载</span>
+    <span class="zt-secondary">引擎状态</span><span id="status" class="zt-path">未启动</span>
+  </section>
+  <div class="zt-close-row"><button id="close" type="button">关闭</button></div>
+</div>
+<script><![CDATA[
+let api = null, refreshTimer = null, draft = null, selectedId = null, trial = null, trialProfile = null;
+let working = false, workKind = '', editing = false, dirty = false, lastState = null, closingAllowed = false;
+let models = { profiles: [], activeId: null, activeProfile: null, presets: [] }, modelsKey = '', confirmationResolve = null;
+const el = Object.fromEntries(Array.from(document.querySelectorAll('[id]')).map(node => [node.id, node]));
+const htmlElement = tag => document.createElementNS('http://www.w3.org/1999/xhtml', tag);
+const clone = value => JSON.parse(JSON.stringify(value));
+const fields = [
+  ['contextTokens', '上下文长度', 512, 131072, 1], ['maxInputTokens', '最大输入 tokens', 1, 131072, 1],
+  ['maxOutputTokens', '最大输出 tokens', 1, 131072, 1], ['temperature', '温度', 0, 2, 0.05],
+  ['topP', 'Top-P', 0.01, 1, 0.05], ['topK', 'Top-K（0 不限制）', 0, 1000, 1],
+  ['repeatPenalty', '重复惩罚', 0.01, 2, 0.05], ['seed', '随机种子', 0, 4294967295, 1],
+];
+for (const [id, title, min, max, step] of fields) {
+  const label = htmlElement('label'); label.className = 'zt-field'; label.htmlFor = id;
+  const text = htmlElement('span'); text.textContent = title;
+  const input = htmlElement('input'); input.id = id; input.type = 'number'; input.min = min; input.max = max; input.step = step;
+  label.append(text, input); el.parameters.append(label); el[id] = input;
+}
+const editableIds = ['configname','modelpath','choose','preset','executionmode','promptTemplate','chatTemplate','threads','gpulayers',...fields.map(field => field[0])];
+const errors = {
+  ENGINE_BUSY: '当前有翻译、加载或检测操作，请等待完成。', MODEL_NOT_FOUND: '模型文件无法读取，可在修改配置后更新文件路径。',
+  MODEL_CHANGED: '模型文件或配置已变化，请重新读取并保存配置。', MODEL_NOT_CONFIGURED: '请新增并保存配置，再切换为当前配置。',
+  MODEL_FORMAT_UNSUPPORTED: '不是有效 GGUF，或当前引擎不支持此格式或架构。', MODEL_SPLIT_UNSUPPORTED: '仅支持单文件 GGUF，不支持分片模型。',
+  MODEL_CONFIG_INVALID: '配置无效，请检查名称、提示词和参数范围。', MODEL_LOAD_FAILED: '模型加载失败，请检查文件和可用内存。',
+  GPU_UNAVAILABLE: '未能使用 GPU 加速，请检查显卡与 Vulkan 驱动。', GPU_OUT_OF_MEMORY: 'GPU 显存不足，可减少 GPU 层数或上下文长度。',
+  GPU_LOAD_FAILED: 'GPU 试运行失败，可能存在兼容性或资源问题。', TEMPLATE_UNSUPPORTED: '聊天模板无法应用，请检查模板。',
+  ENGINE_TIMEOUT: '检测超时，此配置尚未启用。', ENGINE_CRASHED: '推理程序退出，此配置尚未启用。',
+  CANCELLED: '已取消检测，原启用配置保留。', EMPTY_OUTPUT: '试运行未生成完整译文，请检查参数。',
+};
+function errorText(error) { const value = error && error.message ? error.message : String(error); return errors[value] || value; }
+function selectedProfile() { return models.profiles.find(profile => profile.id === selectedId) || null; }
+function isCurrent(profile) { return Boolean(profile && models.activeProfile && profile.id === models.activeId && profile.revision === models.activeProfile.revision); }
+function usingCpuFallback(profile) { return isCurrent(profile) && profile.device.useGpu && !models.activeProfile.device.useGpu; }
+function clearTrial() { trial = null; trialProfile = null; el.testoutput.textContent = ''; }
+function savedMessage() {
+  if (!draft) return '点击“新增”创建模型配置。';
+  if (dirty) return '有未保存的修改。保存不会切换当前翻译配置。';
+  const saved = selectedProfile();
+  return saved ? (isCurrent(saved) ? (usingCpuFallback(saved) ? '已保存，当前以 CPU 使用此版本。可重新检测 GPU。' : '已保存，正在使用此版本。') : '已保存；点击上方“切换为当前配置”后启用。') : '填写模型路径和参数后保存。';
+}
+function buttons() {
+  const blocked = working || !lastState || !lastState.canChangeModel || Boolean(confirmationResolve);
+  const saved = selectedProfile();
+  el.addconfig.disabled = blocked;
+  el.editconfig.disabled = blocked || !saved || editing;
+  el.useconfig.disabled = blocked || !saved || dirty || (isCurrent(saved) && !usingCpuFallback(saved));
+  el.useconfig.textContent = usingCpuFallback(saved) ? '重新检测 GPU' : '切换为当前配置';
+  el.deleteconfig.disabled = blocked || !saved || models.activeId === saved.id;
+  el.saveconfig.disabled = blocked || !editing || !dirty || !draft;
+  el.canceledit.hidden = !editing; el.canceledit.disabled = blocked;
+  for (const id of editableIds) el[id].disabled = blocked || !editing || !draft;
+  el.gpulayers.disabled = blocked || !editing || !draft || el.executionmode.value === 'cpu';
+  el.applycpu.hidden = !trial || trial.status !== 'cpu-fallback';
+  el.applycpu.disabled = blocked || !trialProfile || trialProfile.id !== selectedId;
+  el.canceltest.hidden = workKind !== 'switch'; el.canceltest.disabled = !working;
+  for (const id of ['selftest','restart']) el[id].disabled = blocked || !models.activeProfile;
+  el.release.disabled = blocked || !lastState?.modelStatus?.canRelease;
+  for (const row of el.configrows.children) {
+    row.setAttribute('aria-disabled', String(working || Boolean(confirmationResolve)));
+    if (row.firstElementChild?.firstElementChild) row.firstElementChild.firstElementChild.disabled = working || Boolean(confirmationResolve);
+  }
+}
+function renderRows() {
+  el.configrows.replaceChildren();
+  for (const profile of models.profiles) {
+    const row = htmlElement('tr'); row.dataset.profileId = profile.id; row.classList.toggle('zt-selected', profile.id === selectedId);
+    const name = htmlElement('td'), model = htmlElement('td'), status = htmlElement('td'), button = htmlElement('button');
+    button.type = 'button'; button.className = 'zt-config-name'; button.textContent = profile.name;
+    button.setAttribute('aria-pressed', String(profile.id === selectedId)); name.append(button);
+    model.className = 'zt-model-column'; model.textContent = profile.metadata?.name || profile.path.split(/[\\/]/).pop() || '未选择模型';
+    model.title = profile.path;
+    status.textContent = isCurrent(profile) ? (usingCpuFallback(profile) ? '正在使用（CPU）' : '正在使用') : profile.id === models.activeId ? '有更新待启用' : '已保存';
+    if (isCurrent(profile)) status.className = 'zt-active-state';
+    row.addEventListener('click', () => { if (!working && !confirmationResolve) void selectProfile(profile.id); });
+    row.append(name, model, status); el.configrows.append(row);
+  }
+  if (!models.profiles.length) { const row = htmlElement('tr'), cell = htmlElement('td'); cell.colSpan = 3; cell.textContent = '暂无配置，点击“新增”创建。'; row.append(cell); el.configrows.append(row); }
+  const active = models.activeProfile;
+  const updated = active && models.profiles.some(profile => profile.id === active.id && profile.revision !== active.revision);
+  el.activeconfig.textContent = active ? `正在使用：${active.name}${updated ? '（旧版本）' : ''}` : '尚未启用配置';
+  buttons();
+}
+function renderDraft() {
+  el.paneltitle.textContent = draft ? `配置详情 · ${draft.name || '新配置'}` : '配置详情';
+  el.editstate.textContent = draft ? (editing ? (dirty ? '修改中 · 未保存' : '修改中') : '查看中') : '尚未选择';
+  el.savestatus.textContent = savedMessage();
+  buttons();
+}
+function fillFields() {
+  el.configname.value = draft?.name || ''; el.modelpath.value = draft?.path || ''; el.preset.value = draft?.presetId || '';
+  el.promptTemplate.value = draft?.parameters.promptTemplate || ''; el.chatTemplate.value = draft?.parameters.chatTemplate || '';
+  for (const [id] of fields) el[id].value = draft ? draft.parameters[id] : '';
+  el.executionmode.value = draft?.device.useGpu === false ? 'cpu' : 'gpu';
+  el.threads.value = draft?.device.threads ?? 4; el.gpulayers.value = draft?.device.gpuLayers ?? -1;
+  const meta = draft?.metadata;
+  el.metadata.textContent = meta ? `${meta.name || '未命名'} · ${meta.architecture} · ${(draft.fileSize / 1073741824).toFixed(2)} GiB · ${meta.chatTemplate ? '有内置聊天模板' : '需要填写聊天模板'}` : draft?.path ? '保存时读取模型信息；启用时检测兼容性。' : '尚未选择模型文件';
+  const suggestions = draft ? api.suggestPresets(draft) : [];
+  el.suggestion.textContent = suggestions.length ? `建议预设：${suggestions.map(preset => preset.label).join('、')}。可选择后调整参数。` : '可选择参数预设或填写自定义参数。';
+  renderDraft();
+}
+function collect() {
+  if (!draft) throw new Error('MODEL_NOT_CONFIGURED');
+  const parameters = {...draft.parameters, promptTemplate: el.promptTemplate.value, chatTemplate: el.chatTemplate.value};
+  for (const [id] of fields) parameters[id] = el[id].value.trim() ? Number(el[id].value) : NaN;
+  return {...clone(draft), name: el.configname.value, path: el.modelpath.value, parameters,
+    device: { useGpu: el.executionmode.value === 'gpu', threads: el.threads.value.trim() ? Number(el.threads.value) : NaN, gpuLayers: el.gpulayers.value.trim() ? Number(el.gpulayers.value) : NaN } };
+}
+function changed() {
+  if (!draft || !editing || working) return;
+  draft = collect(); dirty = true; clearTrial(); renderDraft();
+  if (draft.path !== selectedProfile()?.path) el.metadata.textContent = '路径已修改，保存时重新读取模型信息。';
+}
+async function showDraft(profile, edit = true) {
+  draft = clone(profile); selectedId = profile.id; editing = edit; dirty = edit;
+  clearTrial(); fillFields(); renderRows();
+}
+async function reloadModels() {
+  models = api.getModels(); modelsKey = JSON.stringify(models);
+  if (!draft) {
+    const initial = models.profiles.find(profile => profile.id === models.activeId) || models.profiles[0];
+    if (initial) { draft = clone(initial); selectedId = initial.id; editing = false; dirty = false; fillFields(); }
+  }
+  renderRows(); renderDraft();
+}
+function ask(text, label) {
+  if (confirmationResolve) return Promise.resolve(false);
+  el.confirmtext.textContent = text; el.confirmaccept.textContent = label; el.confirmation.hidden = false;
+  return new Promise(resolve => { confirmationResolve = resolve; buttons(); el.confirmcancel.focus(); });
+}
+function answer(value) {
+  const resolve = confirmationResolve; confirmationResolve = null; el.confirmation.hidden = true; buttons(); resolve?.(value);
+}
+async function discardChanges() { return !dirty || await ask('当前配置有未保存的修改。放弃这些修改并继续？', '放弃修改'); }
+async function selectProfile(id) {
+  if (working || confirmationResolve || selectedId === id) return;
+  const retainFocus = el.configrows.contains(document.activeElement);
+  if (!(await discardChanges())) return;
+  const profile = models.profiles.find(item => item.id === id); if (!profile) return;
+  draft = clone(profile); selectedId = id; editing = false; dirty = false; clearTrial(); fillFields(); renderRows();
+  el.operationstatus.textContent = `已选中“${profile.name}”，当前翻译配置未改变。`;
+  if (retainFocus) [...el.configrows.children].find(row => row.dataset.profileId === id)?.firstElementChild?.firstElementChild?.focus();
+}
+function showStatus(state) {
+  lastState = state;
+  el.autorelease.checked = state.autoReleaseModel; el.idle.disabled = !state.autoReleaseModel;
+  if (document.activeElement !== el.idle) el.idle.value = Math.round(state.idleReleaseMs / 60000);
+  el.modelstatus.textContent = state.modelStatus.text;
+  el.status.textContent = state.engineStatusText || state.statusText;
+  if (state.selectionPhase) el.operationstatus.textContent = state.selectionPhase;
+  buttons();
+}
+async function refresh() {
+  if (!api || window.closed) return;
+  try {
+    const state = await api.getState(); if (window.closed) return;
+    const next = api.getModels(), key = JSON.stringify(next);
+    if (key !== modelsKey) { models = next; modelsKey = key; renderRows(); renderDraft(); }
+    showStatus(state);
+  } catch (error) { el.output.textContent = errorText(error); }
+}
+async function act(kind, action) {
+  if (working || confirmationResolve) return;
+  working = true; workKind = kind; el.output.textContent = ''; buttons();
+  try { await action(); } catch (error) { el.output.textContent = errorText(error); el.operationstatus.textContent = errorText(error); }
+  finally { working = false; workKind = ''; if (!window.closed) { await refresh(); buttons(); } }
+}
+el.addconfig.addEventListener('click', async () => {
+  if (working || !(await discardChanges())) return;
+  await showDraft(api.createModel(), true); el.operationstatus.textContent = '新增配置。保存后可切换使用。'; el.configname.focus();
+});
+el.editconfig.addEventListener('click', () => { if (!selectedProfile() || working) return; editing = true; dirty = false; clearTrial(); renderDraft(); el.configname.focus(); });
+el.canceledit.addEventListener('click', async () => {
+  if (working || !(await discardChanges())) return;
+  const profile = selectedProfile() || models.profiles.find(item => item.id === models.activeId) || models.profiles[0];
+  draft = profile ? clone(profile) : null; selectedId = profile?.id || null; editing = false; dirty = false;
+  clearTrial(); fillFields(); renderRows(); el.operationstatus.textContent = '已取消修改。';
+});
+for (const id of ['configname','modelpath','promptTemplate','chatTemplate','threads','gpulayers',...fields.map(field => field[0])]) el[id].addEventListener('input', changed);
+el.executionmode.addEventListener('command', changed);
+el.preset.addEventListener('command', () => {
+  if (!editing || working) return;
+  const id = el.preset.value || null, current = collect();
+  draft = id ? api.applyPreset(current, id) : {...current, presetId: null, presetVersion: null};
+  dirty = true; clearTrial(); fillFields();
+});
+el.choose.addEventListener('click', () => act('choose', async () => {
+  const next = await api.chooseModel(collect()); if (next) { draft = clone(next); selectedId = draft.id; dirty = true; clearTrial(); fillFields(); }
+}));
+el.saveconfig.addEventListener('click', () => act('save', async () => {
+  const saved = await api.saveModel(collect());
+  draft = clone(saved); selectedId = saved.id; editing = false; dirty = false; clearTrial();
+  await reloadModels(); fillFields(); el.operationstatus.textContent = `已保存“${saved.name}”。当前翻译配置未改变。`;
+}));
+async function finishActivation(profile, cpu) {
+  await api.applyModel(profile, cpu); clearTrial(); editing = false; dirty = false;
+  await reloadModels(); fillFields(); el.operationstatus.textContent = `已启用“${profile.name}”${cpu ? '（CPU）' : ''}。`;
+}
+el.useconfig.addEventListener('click', () => act('switch', async () => {
+  const profile = selectedProfile(); if (!profile || dirty) throw new Error('请先保存当前修改。');
+  const candidate = clone(profile); clearTrial(); el.operationstatus.textContent = `正在检测“${candidate.name}”…`;
+  trial = await api.testModel(candidate); trialProfile = candidate;
+  if (trial.status === 'gpu-ready' || trial.status === 'cpu-ready') await finishActivation(candidate, false);
+  else if (trial.status === 'cpu-fallback') {
+    el.testoutput.textContent = `${errorText(trial.gpuError)}\nCPU 试运行通过。点击“以 CPU 启用此配置”后才会切换。`;
+    el.operationstatus.textContent = '等待确认使用 CPU；原启用配置保留。';
+  } else { el.testoutput.textContent = errorText(trial.error || 'CANCELLED'); el.operationstatus.textContent = el.testoutput.textContent; }
+}));
+el.applycpu.addEventListener('click', () => act('switch', async () => {
+  if (trial?.status !== 'cpu-fallback' || !trialProfile || trialProfile.id !== selectedId) throw new Error('请重新检测配置。');
+  await finishActivation(clone(trialProfile), true);
+}));
+el.canceltest.addEventListener('click', () => { api.cancelModelTest(); el.operationstatus.textContent = '正在取消检测，请等待进程退出…'; });
+el.deleteconfig.addEventListener('click', async () => {
+  const profile = selectedProfile(); if (working || !profile || profile.id === models.activeId) return;
+  if (!(await ask(`删除配置“${profile.name}”？仅删除配置记录，模型文件会保留。${dirty ? '未保存的修改也将丢弃。' : ''}`, '删除配置'))) return;
+  await act('delete', async () => {
+    await api.deleteModel(profile.id); draft = null; selectedId = null; editing = false; dirty = false; clearTrial();
+    await reloadModels(); fillFields(); el.operationstatus.textContent = '配置已删除，模型文件未更改。';
+  });
+});
+el.confirmcancel.addEventListener('click', () => answer(false));
+el.confirmaccept.addEventListener('click', () => answer(true));
+el.autorelease.addEventListener('change', async () => { try { await api.setAutoReleaseModel(el.autorelease.checked); await refresh(); } catch (error) { el.output.textContent = errorText(error); } });
+el.idle.addEventListener('change', async () => { try { await api.setIdleMinutes(Number(el.idle.value)); await refresh(); } catch (error) { el.output.textContent = errorText(error); } });
+el.release.addEventListener('click', () => act('release', async () => { const result = await api.releaseModel(); el.output.textContent = result.status === 'released' ? '模型已释放，下次翻译时加载。' : result.status === 'not-loaded' ? '模型未加载。' : errorText(result.error || result.detail || result.status); }));
+el.restart.addEventListener('click', () => act('restart', async () => { const result = await api.restartEngine(); el.output.textContent = result.status === 'restarted' ? '引擎已重新加载。' : errorText(result.detail || result.status); }));
+el.selftest.addEventListener('click', () => act('selftest', async () => { el.output.textContent = '正在自检…'; el.output.textContent = await api.selfTest(); }));
+async function requestClose() {
+  if (!(await discardChanges())) return;
+  api?.cancelModelTest(); closingAllowed = true; window.close();
+}
+el.close.addEventListener('click', () => { void requestClose(); });
+window.addEventListener('close', event => { if (!closingAllowed && dirty) { event.preventDefault(); void requestClose(); } });
+window.addEventListener('beforeunload', event => { if (!closingAllowed && dirty) { event.preventDefault(); event.returnValue = ''; } });
+window.addEventListener('unload', () => { if (refreshTimer) clearInterval(refreshTimer); confirmationResolve?.(false); api?.cancelModelTest(); });
+window.__ztCloseWithoutPrompt = () => {
+  closingAllowed = true;
+  if (confirmationResolve) answer(false);
+  api?.cancelModelTest(); window.close();
+};
+window.__ztInit = function (payload) {
+  if (api) return;
+  api = payload.api;
+  for (const preset of api.getModels().presets) el.preset.appendItem(preset.label, preset.id);
+  void reloadModels().then(refresh).catch(error => { el.output.textContent = errorText(error); });
+  refreshTimer = window.setInterval(refresh, 1000);
+};
+buttons();
+]]></script>
+</body>
+</html>

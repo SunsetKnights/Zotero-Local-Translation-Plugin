@@ -1,0 +1,238 @@
+:root {
+	color-scheme: light dark;
+}
+
+.zt-body {
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	font: menu;
+	background: Window;
+	color: WindowText;
+}
+
+.zt-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border-bottom: 1px solid ThreeDShadow;
+}
+
+.zt-title {
+	font-weight: 600;
+}
+
+.zt-status {
+	opacity: 0.75;
+	font-size: 0.95em;
+}
+
+.zt-spacer {
+	flex: 1;
+}
+
+.zt-section {
+	padding: 8px 12px;
+	display: flex;
+	flex-direction: column;
+}
+
+.zt-grow {
+	flex: 1;
+	min-height: 0;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.zt-loading {
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+	gap: 12px;
+	padding: 24px;
+}
+
+.zt-loading h1 {
+	margin: 0;
+	font-size: 1.15em;
+	font-weight: 600;
+}
+
+.zt-loading p {
+	margin: 0;
+	max-width: 32em;
+	line-height: 1.6;
+	opacity: 0.75;
+}
+
+.zt-loading-spinner {
+	width: 28px;
+	height: 28px;
+	margin-bottom: 4px;
+	border: 3px solid ThreeDShadow;
+	border-top-color: LinkText;
+	border-radius: 50%;
+	animation: zt-loading-spin 1s linear infinite;
+}
+
+@keyframes zt-loading-spin {
+	to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.zt-loading-spinner {
+		animation: none;
+	}
+}
+
+.zt-translation {
+	flex: 1;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+	line-height: 1.55;
+	padding: 10px 12px;
+	border: 1px solid ThreeDShadow;
+	border-radius: 4px;
+	background: Field;
+	color: FieldText;
+	font-size: 1.02em;
+	min-height: 120px;
+}
+
+.zt-translation:empty::before {
+	content: "选中 PDF 文字后点击“翻译”";
+	opacity: 0.5;
+}
+
+#zt-source {
+	box-sizing: border-box;
+	width: 100%;
+	height: 90px;
+	resize: vertical;
+	font: inherit;
+	margin-top: 6px;
+	padding: 8px;
+	border: 1px solid ThreeDShadow;
+	border-radius: 4px;
+	background: Field;
+	color: FieldText;
+}
+
+.zt-footer {
+	display: flex;
+	gap: 8px;
+	padding: 8px 12px;
+	border-top: 1px solid ThreeDShadow;
+}
+
+button {
+	font: inherit;
+	padding: 4px 12px;
+}
+
+.zt-link {
+	border: none;
+	background: transparent;
+	color: LinkText;
+	cursor: pointer;
+	padding: 0 4px;
+}
+
+.zt-prefs {
+  --zt-panel: light-dark(#ffffff, #222229);
+  --zt-selected: light-dark(#e9effb, #2c374c);
+  --zt-hover: light-dark(#f0f2f7, #282c36);
+  --zt-accent: light-dark(#245ccc, #95b7ff);
+  --zt-muted: light-dark(#666672, #b1b1bf);
+  --zt-border: light-dark(#d8d8e0, #43434e);
+  --zt-danger: light-dark(#af3038, #f29da2);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 18px;
+  gap: 14px;
+  overflow: hidden;
+}
+.zt-prefs-scroll { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 18px; overflow: auto; padding-right: 4px; }
+.zt-prefs-scroll > * { flex-shrink: 0; }
+.zt-prefs * { box-sizing: border-box; }
+.zt-prefs h2 { margin: 0; font-size: 1.05em; font-weight: 600; }
+.zt-prefs p { margin: 0; }
+.zt-section-heading, .zt-panel-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+}
+.zt-section-heading { margin-bottom: 10px; }
+.zt-secondary { color: var(--zt-muted); font-size: .94em; }
+.zt-note { color: var(--zt-muted, GrayText); font-size: .94em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.zt-prefs .zt-note:not(:empty) { margin-top: 10px; }
+.zt-prefs .zt-note:empty { display: none; }
+.zt-config-list { border: 1px solid var(--zt-border); border-radius: 6px; overflow: hidden; }
+.zt-config-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.zt-config-table th { background: var(--zt-panel); text-align: left; padding: 8px 12px; color: var(--zt-muted); font-weight: 400; }
+.zt-config-table th:first-child { width: 35%; }
+.zt-config-table th:last-child { width: 25%; }
+.zt-config-table td { padding: 10px 12px; border-top: 1px solid var(--zt-border); overflow-wrap: anywhere; }
+.zt-config-table td.zt-model-column { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zt-config-table tr[data-profile-id] { cursor: pointer; }
+.zt-config-table tr[aria-disabled="true"] { cursor: default; }
+.zt-config-table tr.zt-selected { background: var(--zt-selected); }
+.zt-config-table tr.zt-selected td:first-child { box-shadow: inset 3px 0 var(--zt-accent); }
+.zt-config-table tr:not([aria-disabled="true"]):not(.zt-selected):hover { background: var(--zt-hover); }
+.zt-prefs .zt-config-name { border: none; padding: 0; background: transparent; color: inherit; text-align: left; font-weight: 600; cursor: inherit; overflow-wrap: anywhere; }
+.zt-active-state { color: var(--zt-accent); }
+.zt-config-toolbar, .zt-button-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.zt-config-toolbar { justify-content: space-between; margin-top: 10px; }
+.zt-prefs button { min-height: 28px; }
+.zt-danger-action { color: var(--zt-danger); }
+.zt-prefs .zt-primary-action { background: light-dark(#245ccc, #3368ce); border: 1px solid light-dark(#245ccc, #3368ce); border-radius: 4px; color: white; padding: 6px 12px; }
+.zt-prefs button:disabled { opacity: .5; }
+.zt-confirmation { display: grid; gap: 12px; padding: 14px; margin-top: 12px; background: var(--zt-panel); border: 1px solid var(--zt-border); border-radius: 6px; }
+.zt-confirmation .zt-button-group { justify-content: flex-end; }
+.zt-config-panel { border: 1px solid var(--zt-border); border-radius: 7px; background: var(--zt-panel); }
+.zt-panel-heading { padding: 13px 16px; border-bottom: 1px solid var(--zt-border); }
+.zt-config-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 16px; }
+.zt-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; }
+.zt-wide { grid-column: 1 / -1; }
+.zt-path { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.zt-path-field { display: flex; align-items: center; gap: 8px; }
+.zt-path-field input { flex: 1; min-width: 0; }
+.zt-path-field button { flex: none; }
+.zt-prefs textarea, .zt-prefs input[type="text"], .zt-prefs input[type="number"] {
+  width: 100%; min-width: 0; margin: 0; padding: 6px 8px; border: 1px solid var(--zt-border);
+  border-radius: 4px; background: Field; color: FieldText; font: inherit;
+}
+.zt-prefs textarea { resize: vertical; }
+.zt-prefs input:disabled, .zt-prefs textarea:disabled { color: var(--zt-muted); opacity: 1; }
+.zt-prefs .zt-select {
+  width: 100%; min-width: 0; max-width: 100%; margin: 0; padding: 6px;
+  border: 1px solid var(--zt-border); font: inherit; color: FieldText; background: Field;
+}
+.zt-select menupopup { max-width: min(720px, calc(100vw - 32px)); }
+.zt-select menuitem { min-width: 0; }
+.zt-parameter-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; padding-top: 12px; }
+.zt-panel-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--zt-border); padding: 12px 16px; }
+.zt-panel-footer > .zt-secondary { flex: 1; min-width: 180px; }
+.zt-general-settings { display: grid; gap: 12px; padding-top: 12px; }
+.zt-general-settings > .zt-field { max-width: 300px; }
+.zt-checkbox-row { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+.zt-prefs input[type="checkbox"] { justify-self: start; width: auto; margin-inline: 0; }
+.zt-runtime-status { display: grid; flex-shrink: 0; grid-template-columns: max-content minmax(0, 1fr); gap: 10px 16px; border-top: 1px solid var(--zt-border); padding-top: 14px; }
+.zt-close-row { display: flex; flex-shrink: 0; justify-content: flex-end; }
+@media (max-width: 520px) {
+  .zt-prefs { padding: 12px; }
+  .zt-config-table .zt-model-column { display: none; }
+  .zt-config-table th:first-child { width: 62%; }
+  .zt-config-table th:last-child { width: 38%; }
+  .zt-config-fields, .zt-parameter-grid { grid-template-columns: minmax(0, 1fr); }
+  .zt-path-field { flex-wrap: wrap; }
+  .zt-path-field input { flex-basis: 100%; }
+  .zt-panel-footer .zt-button-group { justify-content: flex-end; width: 100%; }
+}

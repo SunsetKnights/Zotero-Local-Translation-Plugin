@@ -1,0 +1,50 @@
+### Local translation plugin strings (English)
+
+translation-title = Local Translation
+translation-button = Translate
+translation-status-ready = Ready
+translation-status-preparing = Preparing the local model…
+translation-status-running = Translating…
+translation-status-succeeded = Translation complete
+translation-status-cancelled = Cancelled
+translation-status-failed = Translation failed
+translation-source-summary = Source text
+translation-copy = Copy translation
+translation-retry = Retry
+translation-cancel = Cancel
+translation-close = Close
+translation-settings = Settings…
+translation-empty-hint = Select PDF text, then click Translate
+
+translation-error-no-selection = No translatable text was found. Select text in the PDF.
+translation-error-input-too-long = The selection is too long. Shorten it and try again.
+translation-error-unsupported-platform = This system or CPU is not supported yet.
+translation-error-model-not-found = The local model file is missing.
+translation-error-model-not-configured = Save a model configuration in Settings, then activate it.
+translation-error-model-config = Invalid model parameters. Check Settings.
+translation-error-model-changed = The model file changed. Read and test it again.
+translation-error-model-split = Only single-file GGUF models are supported.
+translation-error-model-load = Could not load the model. Check the file and available memory.
+translation-error-gpu-unavailable = GPU acceleration is unavailable. Test the model or use CPU in Settings.
+translation-error-gpu-memory = Insufficient GPU memory. Reduce GPU layers or context length.
+translation-error-gpu-load = GPU inference failed. Test the model again in Settings.
+translation-error-model-hash = The model file failed verification.
+translation-error-model-format = The current engine cannot load this model format.
+translation-error-template = The model template is not supported by this engine.
+translation-error-asset-install = The local translation assets could not be prepared.
+translation-error-engine-start = The local translation engine failed to start.
+translation-error-busy = Another passage is being translated. Try again shortly.
+translation-error-timeout = This translation timed out. Shorten the selection and retry.
+translation-error-crashed = The local engine exited.
+translation-error-protocol = The local engine protocol failed.
+translation-error-empty = No translation was generated.
+translation-error-truncated = The translation may be incomplete.
+translation-error-language = The target language is not supported.
+
+prefs-title = Local Translation Settings
+prefs-threads = CPU threads
+prefs-idle = Release idle engine after (minutes)
+prefs-status = Status
+prefs-selftest = Self-test
+prefs-restart = Restart engine
+prefs-close = Close
