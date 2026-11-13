@@ -49,7 +49,7 @@ npm run verify:package
 主要输出：
 
 ```text
-dist/local-translation-1.0.0-win-x64-lite.xpi
+dist/local-translation-<version>-win-x64-lite.xpi
 dist/updates.json
 dist/build-manifest.json
 dist/SHA256SUMS
@@ -59,35 +59,9 @@ dist/SHA256SUMS
 
 修改插件 TypeScript、界面或样式后，重新执行 `build:addon`、`package` 和 `verify:package`。修改原生 C++ 代码或依赖锁文件后，先重新执行 `build:native`。
 
-## GitHub 发布与自动更新
+## 插件更新
 
-插件主页指向本仓库，`update_url` 指向 `main` 分支根目录 [updates.json 的 Raw 地址](https://raw.githubusercontent.com/SunsetKnights/Zotero-Local-Translation-Plugin/main/updates.json)。根目录清单纳入 Git 管理，只记录已发布版本；XPI 仍存放在 GitHub Releases 中。
-
-打包脚本会生成候选清单 `dist/updates.json`，合并根目录中的历史版本，并写入本次版本号、XPI 下载地址、安装包 SHA-256、兼容版本和 Release 更新说明链接。普通构建不会改写根目录清单，避免提前向用户推送尚未发布的安装包。
-
-仓库提供 [Release 工作流](.github/workflows/release.yml)。将源码提交到 `main` 后，推送与 `package.json` 版本相同的正式版本标签，即可自动构建和发布：
-
-```powershell
-git push origin main
-git tag v1.0.0
-git push origin v1.0.0
-```
-
-工作流在 Windows / Visual Studio 2026 环境构建，校验安装包后上传到草稿 Release，再验证上传文件的 SHA-256 并正式发布。发布成功后，它才将本版本条目合并到 `main` 的根目录清单。已有正式 Release 不会被覆盖；发布新版本时请先提高版本号。工作流使用仓库自带的 `GITHUB_TOKEN`，需要仓库允许 Actions 写入内容。
-
-如果选择手动发布：
-
-1. 修改 `package.json` 的版本号并重新构建。
-2. 在 GitHub 创建正式 Release，标签使用 `v` 加版本号，例如当前的 `v1.0.0`，上传 XPI 并发布。保留安装包原文件名；也可以附上 `SHA256SUMS` 和 `build-manifest.json`。
-3. 确认 XPI 可以下载后，用候选清单替换根目录清单：
-
-   ```powershell
-   Copy-Item -LiteralPath dist/updates.json -Destination updates.json -Force
-   ```
-
-4. 将根目录 `updates.json` 提交并推送到 `main` 分支。Zotero 后续会从固定 Raw 地址读取更新。
-
-`dist/updates.json` 只是待发布副本，不需要上传到 Release。尚未发布首个版本时，根目录清单保持空数组；首次发布 XPI 后再提交版本条目。版本来源为 `package.json`，构建时会覆盖插件清单中的版本字段。
+Zotero 从仓库根目录的 `updates.json` 读取已发布版本、兼容范围和安装包校验值。XPI 安装包也可以从 GitHub Releases 下载。[更新清单](https://raw.githubusercontent.com/SunsetKnights/Zotero-Local-Translation-Plugin/main/updates.json) · [下载已发布版本](https://github.com/SunsetKnights/Zotero-Local-Translation-Plugin/releases)
 
 ## 安装与使用
 

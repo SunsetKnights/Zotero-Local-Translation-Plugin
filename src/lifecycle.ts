@@ -94,8 +94,6 @@ export class LocalTranslationPlugin {
   private assetInstall: Promise<InstallResult> | null = null;
   private taskReader = new Map<string, string>();
   private disposed = false;
-  private cachedDevices: Array<{ name: string; description: string; type: string }> = [];
-  private devicesProbeAt = 0;
   private modelStore: ModelStore;
   private modelSelection: ModelSelection | null = null;
 
@@ -412,15 +410,18 @@ export class LocalTranslationPlugin {
     this.modelStore = store;
   }
 
-  private async chooseModel(draft?: ModelProfile): Promise<ModelProfile | null> {
+  private async chooseModelFile(): Promise<string | null> {
     this.assertModelChangeAllowed();
     const { FilePicker } = ChromeUtils.importESModule('chrome://zotero/content/modules/filePicker.mjs');
     const picker = new FilePicker();
     picker.init(this.preferencesWindow ?? Zotero.getMainWindow(), '选择单文件 GGUF 模型', picker.modeOpen);
     picker.appendFilter('GGUF 模型', '*.gguf');
-    if (await picker.show() !== picker.returnOK) return null;
-    // Recheck after the native dialog; another window may have started a task.
-    return this.modelSelection!.select(picker.file, draft);
+    const result = await picker.show();
+    if (result === picker.returnCancel) return null;
+    if (result !== picker.returnOK) throw new Error('MODEL_PICKER_FAILED');
+    const path = picker.file;
+    if (!path) throw new Error('MODEL_PICKER_FAILED');
+    return path;
   }
 
   // --- ui helpers -----------------------------------------------------------
@@ -476,7 +477,7 @@ export class LocalTranslationPlugin {
         this.assertModelChangeAllowed();
         return createEmptyProfile(this.settings);
       },
-      chooseModel: (draft?: ModelProfile) => this.chooseModel(draft),
+      chooseModelFile: () => this.chooseModelFile(),
       saveModel: (profile: ModelProfile) => this.modelSelection!.save(profile),
       deleteModel: (id: string) => this.modelSelection!.remove(id),
       readModel: (id: string) => {
@@ -576,15 +577,10 @@ export class LocalTranslationPlugin {
     activeModelPath: string;
     activeModelName: string;
     engineStatusText: string;
-    statusText: string;
     modelStatus: { state: ModelStatusKind; text: string; canRelease: boolean };
   }> {
     const info = this.manager?.isReady ? this.manager.info : null;
     const managerStatus = this.manager?.status ?? null;
-    // Status only reads cached process state and the already probed device
-    // list; it never calls ensureReady() and therefore never loads weights.
-    const devices = await this.devices();
-    const gpu = devices.filter((d) => d.type !== 'cpu').map((d) => d.name).join(', ') || '无';
     const layers = info?.gpuLayers;
     const backend = layers === undefined
       ? '未启动'
@@ -602,14 +598,6 @@ export class LocalTranslationPlugin {
     const canRelease = kind === 'ready' && managerStatus !== null
       && managerStatus.usageCount === 0 && !managerStatus.pendingConfigChange;
 
-    const statusText = [
-      `模型状态：${modelStatusText(kind)}`,
-      `当前模型：${this.activeModel?.path ?? '尚未选择，请选择模型并检测'}`,
-      `引擎：${info?.engineCommit ? info.engineCommit.slice(0, 10) : (this.manifests?.runtime.buildId ?? '未启动')}${info?.engineVersion ? `（b${info.engineVersion}）` : ''}`,
-      `单次翻译容量：${info?.contextTokens ?? this.activeModel?.parameters.contextTokens ?? CONTEXT_TOKENS} tokens，线程：${info?.threads ?? this.activeModel?.device.threads ?? this.settings.threads}`,
-      `GPU 设备：${gpu}`,
-      `执行后端：${backend}`,
-    ].join('\n');
     const engineStatusText = this.modelSelection?.locked
       ? (this.modelSelection.phase || '正在处理配置…')
       : info
@@ -629,29 +617,12 @@ export class LocalTranslationPlugin {
       activeModelPath: this.activeModel?.path ?? '',
       activeModelName: this.activeModel?.name ?? '',
       engineStatusText,
-      statusText,
       modelStatus: {
         state: kind,
         text: modelStatusText(kind),
         canRelease,
       },
     };
-  }
-
-  private async devices(): Promise<Array<{ name: string; description: string; type: string }>> {
-    if (this.cachedDevices.length > 0) return this.cachedDevices;
-    // Status polling must not spawn a helper every couple of seconds when the
-    // weight-free probe fails; retry at most every 30 s.
-    if (Date.now() - this.devicesProbeAt < 30_000) return this.cachedDevices;
-    this.devicesProbeAt = Date.now();
-    try {
-      await this.ensureAssets();
-      this.cachedDevices = await this.manager!.probeDevices();
-    }
-    catch {
-      this.cachedDevices = [];
-    }
-    return this.cachedDevices;
   }
 
   private async selfTest(): Promise<string> {

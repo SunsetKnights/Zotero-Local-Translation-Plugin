@@ -1,5 +1,5 @@
 import type { ModelMetadata, ModelProfile, ModelStore } from '../../shared/model-config';
-import { createProfile, validateProfile } from './model-config';
+import { validateProfile } from './model-config';
 
 export interface TrialResult {
   status: 'gpu-ready' | 'cpu-ready' | 'cpu-fallback' | 'failed' | 'cancelled';
@@ -70,25 +70,6 @@ export class ModelSelection {
     if (signal.aborted || this.disposed) throw new Error('CANCELLED');
   }
 
-  /** Selecting a file only edits the supplied draft. The same GGUF can belong
-   * to several configurations with different prompts and device settings. */
-  select(path: string, previous?: ModelProfile): Promise<ModelProfile> {
-    const draft = previous ? copy(previous) : null;
-    return this.run('正在读取模型信息…', async (signal) => {
-      if (!/\.gguf$/i.test(path)) throw new Error('MODEL_FORMAT_UNSUPPORTED');
-      const stat = await this.deps.stat(path);
-      this.assertNotCancelled(signal);
-      const metadata = await this.deps.inspect(path, signal);
-      this.assertNotCancelled(signal);
-      const after = await this.deps.stat(path);
-      this.assertNotCancelled(signal);
-      if (stat.size !== after.size || stat.lastModified !== after.lastModified) throw new Error('MODEL_CHANGED');
-      this.verified = null;
-      if (draft) return { ...draft, path, metadata, fileSize: stat.size, lastModified: stat.lastModified };
-      return createProfile({ path, metadata, fileSize: stat.size, lastModified: stat.lastModified });
-    });
-  }
-
   private editableRevision(candidate: ModelProfile, store: ModelStore): ModelProfile | undefined {
     const saved = store.profiles.find((profile) => profile.id === candidate.id);
     if (saved ? candidate.revision !== saved.revision : candidate.revision !== 0) throw new Error('MODEL_CHANGED');
@@ -106,6 +87,9 @@ export class ModelSelection {
     return this.run('正在保存配置…', async (signal) => {
       this.verified = null;
       if (typeof candidate.name === 'string') candidate.name = candidate.name.trim();
+      if (typeof candidate.path === 'string') {
+        candidate.path = candidate.path.trim().replace(/^"(.*)"$/, '$1').replace(/\//g, '\\');
+      }
       // Validate before IO, but do not use metadata from a previous model path.
       this.validate({ ...candidate, metadata: undefined });
       const existing = this.editableRevision(candidate, this.deps.getStore());

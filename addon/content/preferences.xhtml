@@ -32,7 +32,7 @@
     <div class="zt-panel-heading"><h2 id="paneltitle">配置详情</h2><span id="editstate" class="zt-secondary">尚未选择</span></div>
     <div class="zt-config-fields">
       <label class="zt-field zt-wide" for="configname"><span>配置名称</span><input id="configname" type="text" maxlength="100" placeholder="例如：论文翻译 / CPU 备用" disabled="disabled"/></label>
-      <div class="zt-field zt-wide"><label for="modelpath">模型文件</label><div class="zt-path-field"><input id="modelpath" type="text" placeholder="选择或填写单文件 GGUF 路径" disabled="disabled"/><button id="choose" type="button" disabled="disabled">选择文件…</button></div><span id="metadata" class="zt-secondary zt-path">尚未选择模型文件</span></div>
+      <div class="zt-field zt-wide"><label for="modelpath">模型文件</label><div class="zt-path-field"><input id="modelpath" type="text" placeholder="选择文件或粘贴 GGUF 的完整路径" disabled="disabled"/><button id="choose" type="button" disabled="disabled">选择文件…</button></div><span id="pickerstatus" class="zt-secondary" role="status" hidden="hidden"></span><span id="metadata" class="zt-secondary zt-path">尚未选择模型文件</span></div>
       <div class="zt-field"><label id="preset-label" for="preset">参数预设</label><xul:menulist id="preset" class="zt-select" native="true" crop="end" sizetopopup="none" aria-labelledby="preset-label" disabled="true"><xul:menupopup><xul:menuitem value="" label="自定义参数"/></xul:menupopup></xul:menulist></div>
       <div class="zt-field"><label id="executionmode-label" for="executionmode">推理方式</label><xul:menulist id="executionmode" class="zt-select" native="true" crop="end" sizetopopup="none" aria-labelledby="executionmode-label" disabled="true"><xul:menupopup><xul:menuitem value="gpu" label="GPU 优先"/><xul:menuitem value="cpu" label="仅 CPU"/></xul:menupopup></xul:menulist></div>
       <p id="suggestion" class="zt-note zt-wide"></p>
@@ -63,6 +63,7 @@
 <script><![CDATA[
 let api = null, refreshTimer = null, draft = null, selectedId = null, trial = null, trialProfile = null;
 let working = false, workKind = '', editing = false, dirty = false, lastState = null, closingAllowed = false;
+let pickerPending = false, pathRevision = 0;
 let models = { profiles: [], activeId: null, activeProfile: null, presets: [] }, modelsKey = '', confirmationResolve = null;
 const el = Object.fromEntries(Array.from(document.querySelectorAll('[id]')).map(node => [node.id, node]));
 const htmlElement = tag => document.createElementNS('http://www.w3.org/1999/xhtml', tag);
@@ -82,6 +83,9 @@ for (const [id, title, min, max, step] of fields) {
 const editableIds = ['configname','modelpath','choose','preset','executionmode','promptTemplate','chatTemplate','threads','gpulayers',...fields.map(field => field[0])];
 const errors = {
   ENGINE_BUSY: '当前有翻译、加载或检测操作，请等待完成。', MODEL_NOT_FOUND: '模型文件无法读取，可在修改配置后更新文件路径。',
+  MODEL_PICKER_FAILED: '文件选择器无法读取路径，可以在“模型文件”中粘贴完整的 GGUF 路径。',
+  ASSET_INSTALL_FAILED: '推理程序未能安装，请检查 Zotero 配置目录的写入权限。',
+  ENGINE_START_FAILED: '推理程序未能启动，无法读取模型文件。',
   MODEL_CHANGED: '模型文件或配置已变化，请重新读取并保存配置。', MODEL_NOT_CONFIGURED: '请新增并保存配置，再切换为当前配置。',
   MODEL_FORMAT_UNSUPPORTED: '不是有效 GGUF，或当前引擎不支持此格式或架构。', MODEL_SPLIT_UNSUPPORTED: '仅支持单文件 GGUF，不支持分片模型。',
   MODEL_CONFIG_INVALID: '配置无效，请检查名称、提示词和参数范围。', MODEL_LOAD_FAILED: '模型加载失败，请检查文件和可用内存。',
@@ -90,7 +94,11 @@ const errors = {
   ENGINE_TIMEOUT: '检测超时，此配置尚未启用。', ENGINE_CRASHED: '推理程序退出，此配置尚未启用。',
   CANCELLED: '已取消检测，原启用配置保留。', EMPTY_OUTPUT: '试运行未生成完整译文，请检查参数。',
 };
-function errorText(error) { const value = error && error.message ? error.message : String(error); return errors[value] || value; }
+function errorText(error) {
+  const value = error && error.message ? error.message : String(error);
+  const detail = typeof error?.cause === 'string' ? `\n${error.cause}` : '';
+  return (errors[value] || value) + detail;
+}
 function selectedProfile() { return models.profiles.find(profile => profile.id === selectedId) || null; }
 function isCurrent(profile) { return Boolean(profile && models.activeProfile && profile.id === models.activeId && profile.revision === models.activeProfile.revision); }
 function usingCpuFallback(profile) { return isCurrent(profile) && profile.device.useGpu && !models.activeProfile.device.useGpu; }
@@ -112,6 +120,7 @@ function buttons() {
   el.saveconfig.disabled = blocked || !editing || !dirty || !draft;
   el.canceledit.hidden = !editing; el.canceledit.disabled = blocked;
   for (const id of editableIds) el[id].disabled = blocked || !editing || !draft;
+  el.choose.disabled ||= pickerPending;
   el.gpulayers.disabled = blocked || !editing || !draft || el.executionmode.value === 'cpu';
   el.applycpu.hidden = !trial || trial.status !== 'cpu-fallback';
   el.applycpu.disabled = blocked || !trialProfile || trialProfile.id !== selectedId;
@@ -150,6 +159,7 @@ function renderDraft() {
   buttons();
 }
 function fillFields() {
+  pathRevision++;
   el.configname.value = draft?.name || ''; el.modelpath.value = draft?.path || ''; el.preset.value = draft?.presetId || '';
   el.promptTemplate.value = draft?.parameters.promptTemplate || ''; el.chatTemplate.value = draft?.parameters.chatTemplate || '';
   for (const [id] of fields) el[id].value = draft ? draft.parameters[id] : '';
@@ -208,7 +218,7 @@ function showStatus(state) {
   el.autorelease.checked = state.autoReleaseModel; el.idle.disabled = !state.autoReleaseModel;
   if (document.activeElement !== el.idle) el.idle.value = Math.round(state.idleReleaseMs / 60000);
   el.modelstatus.textContent = state.modelStatus.text;
-  el.status.textContent = state.engineStatusText || state.statusText;
+  el.status.textContent = state.engineStatusText;
   if (state.selectionPhase) el.operationstatus.textContent = state.selectionPhase;
   buttons();
 }
@@ -229,7 +239,11 @@ async function act(kind, action) {
 }
 el.addconfig.addEventListener('click', async () => {
   if (working || !(await discardChanges())) return;
-  await showDraft(api.createModel(), true); el.operationstatus.textContent = '新增配置。保存后可切换使用。'; el.configname.focus();
+  await act('create', async () => {
+    await showDraft(api.createModel(), true);
+    el.operationstatus.textContent = '新增配置。保存后可切换使用。';
+  });
+  if (!el.configname.disabled) el.configname.focus();
 });
 el.editconfig.addEventListener('click', () => { if (!selectedProfile() || working) return; editing = true; dirty = false; clearTrial(); renderDraft(); el.configname.focus(); });
 el.canceledit.addEventListener('click', async () => {
@@ -238,7 +252,8 @@ el.canceledit.addEventListener('click', async () => {
   draft = profile ? clone(profile) : null; selectedId = profile?.id || null; editing = false; dirty = false;
   clearTrial(); fillFields(); renderRows(); el.operationstatus.textContent = '已取消修改。';
 });
-for (const id of ['configname','modelpath','promptTemplate','chatTemplate','threads','gpulayers',...fields.map(field => field[0])]) el[id].addEventListener('input', changed);
+for (const id of ['configname','promptTemplate','chatTemplate','threads','gpulayers',...fields.map(field => field[0])]) el[id].addEventListener('input', changed);
+el.modelpath.addEventListener('input', () => { pathRevision++; changed(); });
 el.executionmode.addEventListener('command', changed);
 el.preset.addEventListener('command', () => {
   if (!editing || working) return;
@@ -246,9 +261,28 @@ el.preset.addEventListener('command', () => {
   draft = id ? api.applyPreset(current, id) : {...current, presetId: null, presetVersion: null};
   dirty = true; clearTrial(); fillFields();
 });
-el.choose.addEventListener('click', () => act('choose', async () => {
-  const next = await api.chooseModel(collect()); if (next) { draft = clone(next); selectedId = draft.id; dirty = true; clearTrial(); fillFields(); }
-}));
+el.choose.addEventListener('click', async () => {
+  if (el.choose.disabled) return;
+  const revision = pathRevision;
+  pickerPending = true;
+  el.pickerstatus.textContent = '等待文件选择窗口。也可以直接粘贴 GGUF 的完整路径。';
+  el.pickerstatus.hidden = false;
+  buttons();
+  try {
+    const path = await api.chooseModelFile();
+    if (path && !window.closed && editing && !working && revision === pathRevision) {
+      el.modelpath.value = path;
+      pathRevision++;
+      changed();
+    }
+    if (!window.closed) el.pickerstatus.hidden = true;
+  } catch (error) {
+    if (!window.closed) el.pickerstatus.textContent = errorText(error);
+  } finally {
+    pickerPending = false;
+    if (!window.closed) buttons();
+  }
+});
 el.saveconfig.addEventListener('click', () => act('save', async () => {
   const saved = await api.saveModel(collect());
   draft = clone(saved); selectedId = saved.id; editing = false; dirty = false; clearTrial();

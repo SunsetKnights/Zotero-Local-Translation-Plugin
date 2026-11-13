@@ -1,7 +1,6 @@
 import {
   PROTOCOL_VERSION,
   TARGET_LANGUAGE,
-  type DeviceInfo,
   type ErrorCode,
   type IncomingFrame,
   type ReadyInfo,
@@ -742,33 +741,6 @@ export class NativeHostManager {
     await this.beginClose('dispose').catch(() => undefined);
     // The plugin instance is gone; no task can legitimately still own usage.
     this.pendingUsage.clear();
-  }
-
-  async probeDevices(): Promise<DeviceInfo[]> {
-    const config = this.options.getConfig();
-    const proc = await this.options.spawner.spawn(config.helperPath, ['--probe-devices']);
-    const decoder = new LineDecoder();
-    let buffer = '';
-    try {
-      for (;;) {
-        const chunk = await proc.read();
-        if (!chunk) break;
-        for (const line of decoder.push(chunk)) {
-          buffer += line;
-        }
-      }
-    }
-    finally {
-      await Promise.resolve(proc.kill()).catch(() => undefined);
-    }
-    if (!buffer) return [];
-    try {
-      const parsed = JSON.parse(buffer) as { devices?: DeviceInfo[] };
-      return parsed.devices ?? [];
-    }
-    catch {
-      return [];
-    }
   }
 
   // --- closing --------------------------------------------------------------

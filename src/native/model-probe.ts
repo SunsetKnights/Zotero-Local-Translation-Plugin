@@ -60,10 +60,16 @@ export async function inspectModel(spawner: ProcessSpawner, helper: string, path
         if (output.length > 2 * 1024 * 1024) throw new Error('MODEL_FORMAT_UNSUPPORTED');
       }
       output += decoder.decode();
+      if (!output.trim()) {
+        const { exitCode } = await spawned.wait();
+        throw new Error('ENGINE_START_FAILED', { cause: `模型检查程序未返回结果（退出码 ${exitCode ?? '未知'}）。` });
+      }
       let result;
       try { result = JSON.parse(output.trim()); }
       catch { throw new Error('MODEL_FORMAT_UNSUPPORTED'); }
-      if (result?.type === 'error') throw new Error(result.code || 'MODEL_FORMAT_UNSUPPORTED');
+      if (result?.type === 'error') {
+        throw new Error(result.code || 'MODEL_FORMAT_UNSUPPORTED', { cause: result.detail });
+      }
       if (result?.type !== 'model-info' || typeof result.architecture !== 'string' || !result.architecture.trim()) {
         throw new Error('MODEL_FORMAT_UNSUPPORTED');
       }
