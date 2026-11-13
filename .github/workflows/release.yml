@@ -45,8 +45,18 @@ jobs:
 
       - name: Build and verify package
         run: |
-          npm run build
-          if ($LASTEXITCODE -ne 0) { throw 'Build or package verification failed' }
+          npm run typecheck
+          if ($LASTEXITCODE -ne 0) { throw 'TypeScript check failed' }
+          # Stay in the runner's PowerShell 7 process. Launching Windows
+          # PowerShell 5 from pwsh inherits an incompatible module search path.
+          & ./scripts/build-native.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Native build failed' }
+          npm run build:addon
+          if ($LASTEXITCODE -ne 0) { throw 'Addon build failed' }
+          npm run package
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          npm run verify:package
+          if ($LASTEXITCODE -ne 0) { throw 'Package verification failed' }
 
       - name: Publish GitHub Release
         env:
