@@ -3,6 +3,18 @@
     "local-translation@zotero.plugin": {
       "updates": [
         {
+          "version": "1.0.2",
+          "update_link": "https://github.com/SunsetKnights/Zotero-Local-Translation-Plugin/releases/download/v1.0.2/local-translation-1.0.2-win-x64-lite.xpi",
+          "update_hash": "sha256:78ab96698997097bd5a11b341e7b5a6f028f038e6d40d3e4924d8ea2927d6937",
+          "update_info_url": "https://github.com/SunsetKnights/Zotero-Local-Translation-Plugin/releases/tag/v1.0.2",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "8.0",
+              "strict_max_version": "11.*"
+            }
+          }
+        },
+        {
           "version": "1.0.1",
           "update_link": "https://github.com/SunsetKnights/Zotero-Local-Translation-Plugin/releases/download/v1.0.1/local-translation-1.0.1-win-x64-lite.xpi",
           "update_hash": "sha256:79ad6222b8bf2a86f361bc22dac72225e8517dc87ca2e496f685d42fcc3b88d4",
