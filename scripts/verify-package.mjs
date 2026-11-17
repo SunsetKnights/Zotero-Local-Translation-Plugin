@@ -29,6 +29,48 @@ async function hashEntry(zipPath, entry) {
   return sha256(data);
 }
 
+function peImports(data) {
+  const u16 = offset => data.readUInt16LE(offset), u32 = offset => data.readUInt32LE(offset);
+  const pe = u32(0x3c), optional = pe + 24, magic = u16(optional);
+  if (u16(0) !== 0x5a4d || u32(pe) !== 0x4550 || ![0x10b, 0x20b].includes(magic)) throw new Error('invalid PE header');
+  const directories = optional + (magic === 0x20b ? 112 : 96), sections = optional + u16(pe + 20);
+  const sectionCount = u16(pe + 6), imports = [];
+  if (sections < directories || sections + sectionCount * 40 > data.length) throw new Error('truncated PE headers');
+  const offsetOf = (rva, size = 1) => {
+    let offset = rva < u32(optional + 60) ? rva : -1;
+    for (let i = 0; offset < 0 && i < sectionCount; i++) {
+      const section = sections + i * 40, address = u32(section + 12), bytes = u32(section + 16);
+      if (rva >= address && rva + size <= address + bytes) offset = u32(section + 20) + rva - address;
+    }
+    if (offset < 0 || offset + size > data.length) throw new Error('invalid PE import address');
+    return offset;
+  };
+  for (const directory of [1, 13]) { // Normal imports and delay-load imports.
+    if (u32(directories - 4) <= directory) continue;
+    const entry = directories + directory * 8;
+    if (entry + 8 > sections) throw new Error('truncated PE data directories');
+    const rva = u32(entry), size = u32(entry + 4), stride = directory === 1 ? 20 : 32;
+    if (!rva) continue;
+    let terminated = false;
+    for (let cursor = 0; cursor + stride <= size; cursor += stride) {
+      const descriptor = offsetOf(rva + cursor, stride);
+      if (data.subarray(descriptor, descriptor + stride).every(byte => byte === 0)) { terminated = true; break; }
+      let nameRva = u32(descriptor + (directory === 1 ? 12 : 4));
+      if (directory === 13 && !(u32(descriptor) & 1)) {
+        nameRva -= magic === 0x20b ? Number(data.readBigUInt64LE(optional + 24)) : u32(optional + 28);
+      }
+      const start = offsetOf(nameRva), end = data.indexOf(0, start);
+      if (end < 0 || end - start > 256) throw new Error('invalid PE import name');
+      offsetOf(nameRva, end - start + 1);
+      const name = data.toString('ascii', start, end).toLowerCase();
+      if (!/^[a-z0-9_.-]+\.dll$/.test(name)) throw new Error('invalid PE import name');
+      imports.push(name);
+    }
+    if (!terminated) throw new Error('unterminated PE import table');
+  }
+  return imports;
+}
+
 async function main() {
   const xpi = argXpi ? path.resolve(argXpi) : await findXpi();
   check('xpi exists', fs.existsSync(xpi), xpi);
@@ -103,6 +145,20 @@ async function main() {
       const sha = await hashEntry(xpi, entry);
       check(`runtime ${file.name} sha256 matches`, sha === file.sha256, sha.slice(0, 16) + '…');
     }
+  }
+
+  const runtimeEntries = entries.filter(entry => /^payload\/runtime\/win-x64\/[^/]+\.(exe|dll)$/i.test(entry.name));
+  const bundledDlls = new Set(runtimeEntries.filter(entry => /\.dll$/i.test(entry.name)).map(entry => path.posix.basename(entry.name).toLowerCase()));
+  // Vulkan's optional backend uses the loader installed by the GPU driver.
+  const systemDlls = new Set(['kernel32.dll', 'advapi32.dll', 'crypt32.dll', 'shell32.dll', 'ws2_32.dll',
+    'psapi.dll', 'ole32.dll', 'oleaut32.dll', 'vulkan-1.dll']);
+  for (const entry of runtimeEntries) {
+    try {
+      const missing = [...new Set(peImports(readZipEntry(xpi, entry.name)))].filter(name => !bundledDlls.has(name)
+        && !systemDlls.has(name) && !/^(api-ms-win|ext-ms-win)-[a-z0-9-]+\.dll$/.test(name));
+      check(`runtime ${path.posix.basename(entry.name)} dependencies bundled`, missing.length === 0, missing.join(', '));
+    }
+    catch (error) { check(`runtime ${path.posix.basename(entry.name)} PE imports valid`, false, error.message); }
   }
 
   const addonManifest = JSON.parse(readZipEntry(xpi, 'manifest.json').toString('utf8'));

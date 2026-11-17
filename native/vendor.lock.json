@@ -43,7 +43,7 @@
       "LLAMA_BUILD_TOOLS": "OFF",
       "LLAMA_BUILD_SERVER": "OFF",
       "LLAMA_BUILD_COMMON": "ON",
-      "LLAMA_CURL": "OFF"
+      "LLAMA_OPENSSL": "OFF"
     },
     "minimumCpu": "x86-64 baseline; runtime picks the best CPU variant DLL (AVX2/AVX-VNNI/...)",
     "backends": ["cpu", "vulkan"]
